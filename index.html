@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>ReelCreator Simple</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        
+        <div class="controls-panel">
+            <h2>🛠️ Controles Rápidos</h2>
+            <hr>
+            
+            <label for="video-files" class="btn primary-btn">
+                ➕ Agregar Imágenes/Videos
+                <input type="file" id="video-files" multiple accept="image/*, video/*" hidden>
+            </label>
+            
+            <label for="audio-file" class="btn secondary-btn">
+                🎵 Agregar Audio de Fondo
+                <input type="file" id="audio-file" accept="audio/*" hidden>
+            </label>
+            
+            <textarea id="text-input" placeholder="Escribe el texto principal del Reel (ej: Viajes increíbles)"></textarea>
+
+            <div id="file-list" class="file-list">
+                </div>
+
+            <button id="generate-btn" class="btn generate-btn">
+                ⚡ Generar y Descargar MP4
+            </button>
+        </div>
+
+        <div class="editor-area">
+            
+            <div class="preview-box">
+                <div id="preview-display">
+                    <p>Carga tus archivos para empezar...</p>
+                </div>
+            </div>
+            
+            <div class="timeline-area">
+                <h3>Línea de Tiempo Simple (El orden aquí será el orden del Reel)</h3>
+                <ul id="timeline-clips">
+                    </ul>
+            </div>
+        </div>
+    </div>
+    
+    <script src="script.js"></script>
+</body>
+</html>

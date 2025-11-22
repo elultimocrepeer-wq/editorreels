@@ -1,0 +1,154 @@
+// Variable global para almacenar los archivos cargados
+let loadedFiles = [];
+let audioFile = null;
+
+// Referencias a elementos del DOM (Conexión con los IDs de index.html)
+const videoFileInput = document.getElementById('video-files');
+const audioFileInput = document.getElementById('audio-file');
+const timelineClips = document.getElementById('timeline-clips');
+const generateButton = document.getElementById('generate-btn');
+const textInput = document.getElementById('text-input');
+const previewDisplay = document.getElementById('preview-display');
+
+// ------------------------------------------
+// 1. LÓGICA DE CARGA DE ARCHIVOS
+// ------------------------------------------
+
+// Maneja la carga de múltiples imágenes/videos
+videoFileInput.addEventListener('change', (event) => {
+    const newFiles = Array.from(event.target.files);
+    
+    newFiles.forEach(file => {
+        // Asigna un ID único: Python lo necesita para identificar cada archivo
+        file.uniqueId = 'clip-' + Date.now() + '-' + Math.random().toString(36).substring(2, 9);
+        loadedFiles.push(file);
+        
+        // Actualiza la visualización
+        addClipToTimeline(file);
+        updateSimplePreview(file);
+    });
+
+    event.target.value = null; // Limpia el input
+});
+
+// Maneja la carga del archivo de audio
+audioFileInput.addEventListener('change', (event) => {
+    audioFile = event.target.files[0];
+    alert(`🎵 Audio cargado: ${audioFile.name}`);
+});
+
+// ------------------------------------------
+// 2. VISUALIZACIÓN SIMPLE
+// ------------------------------------------
+
+function addClipToTimeline(file) {
+    const li = document.createElement('li');
+    li.id = file.uniqueId;
+    // Muestra el nombre y tipo de archivo en la línea de tiempo
+    li.textContent = `${file.name.substring(0, 20)}... (${file.type.split('/')[0]})`;
+    li.dataset.fileId = file.uniqueId;
+    timelineClips.appendChild(li);
+}
+
+function updateSimplePreview(file) {
+    previewDisplay.innerHTML = ''; 
+    const fileURL = URL.createObjectURL(file); // URL temporal para mostrar el archivo
+
+    // Muestra la imagen o el video en el área de previsualización
+    if (file.type.startsWith('image')) {
+        const img = document.createElement('img');
+        img.src = fileURL;
+        img.style.maxWidth = '100%';
+        img.style.maxHeight = '100%';
+        previewDisplay.appendChild(img);
+    } else if (file.type.startsWith('video')) {
+        const video = document.createElement('video');
+        video.src = fileURL;
+        video.controls = true;
+        video.autoplay = true;
+        video.loop = true;
+        video.style.maxWidth = '100%';
+        video.style.maxHeight = '100%';
+        previewDisplay.appendChild(video);
+    }
+    
+    // Vuelve a añadir el campo de texto (para que esté encima de la previsualización)
+    previewDisplay.appendChild(textInput);
+}
+
+// ------------------------------------------
+// 3. GENERACIÓN Y ENVÍO A PYTHON
+// ------------------------------------------
+
+generateButton.addEventListener('click', async () => {
+    if (loadedFiles.length === 0) {
+        alert("🚨 Por favor, carga al menos una imagen o video.");
+        return;
+    }
+
+    // 1. Obtener el orden de los clips de la línea de tiempo
+    const timelineOrder = Array.from(timelineClips.children).map(li => li.dataset.fileId);
+
+    // 2. Crear la configuración JSON (instrucciones para Python)
+    const config = {
+        clips: timelineOrder.map(id => {
+            const file = loadedFiles.find(f => f.uniqueId === id);
+            return {
+                id: file.uniqueId,
+                name: file.name,
+                type: file.type,
+                // Le decimos a Python la duración que queremos (5s para imágenes)
+                duration: file.type.startsWith('image') ? 5 : null, 
+            };
+        }),
+        audioName: audioFile ? audioFile.name : null,
+        text: textInput.value || ""
+    };
+    
+    // 3. Empaquetar todo en FormData (el "sobre" para enviar)
+    const formData = new FormData();
+    formData.append('config', JSON.stringify(config)); // Las instrucciones
+
+    // Los archivos multimedia (imágenes, videos, audio)
+    loadedFiles.forEach(file => {
+        formData.append(file.uniqueId, file, file.name); 
+    });
+    if (audioFile) {
+        formData.append('audio_file', audioFile, audioFile.name);
+    }
+
+    alert("⚙️ Enviando archivos a Python para procesamiento...");
+    generateButton.disabled = true; // Deshabilita el botón
+
+    // 4. Enviar a Python (a la ruta /generate-reel que crearemos en app.py)
+    try {
+        const response = await fetch('/generate-reel', {
+            method: 'POST',
+            body: formData 
+        });
+
+        if (response.ok) {
+            // 5. Descargar el MP4 devuelto por Python
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            
+            // Simula el clic en un enlace de descarga
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'reel_final_' + Date.now() + '.mp4';
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            window.URL.revokeObjectURL(url);
+            alert("✅ ¡Reel generado y descargado con éxito!");
+        } else {
+            const errorText = await response.text();
+            alert(`❌ Error al generar el Reel: ${errorText}`);
+        }
+    } catch (error) {
+        console.error('Error de red:', error);
+        alert('❌ Error de conexión con el servidor Python.');
+    } finally {
+        generateButton.disabled = false; // Vuelve a habilitar el botón
+    }
+});
